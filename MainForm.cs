@@ -103,11 +103,13 @@ namespace MinimalGCS
             }
             else if (pkt.MessageId == 33 && pkt.Payload.Length >= 20) // GLOBAL_POSITION_INT
             {
-                state.Alt = BitConverter.ToInt32(pkt.Payload, 16) / 1000.0f;
+                int relAlt = BitConverter.ToInt32(pkt.Payload, 16);
+                state.Alt = relAlt / 1000.0f;
+                state.AddLog($"ALT RAW: {relAlt}, ALT (m): {state.Alt:F1}");
             }
-            else if (pkt.MessageId == 74 && pkt.Payload.Length >= 16) // VFR_HUD
+            else if (pkt.MessageId == 74) // VFR_HUD (No longer used for Alt per strict request)
             {
-                state.Alt = BitConverter.ToSingle(pkt.Payload, 12);
+                // Speed data only
             }
             else if (pkt.MessageId == 42 && pkt.Payload.Length >= 2) // MISSION_CURRENT
             {
