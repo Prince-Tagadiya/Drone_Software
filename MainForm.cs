@@ -38,7 +38,7 @@ namespace MinimalGCS
 
         private void SetupAgriUI()
         {
-            this.Text = "Agri-Drone Enterprise v1.2.6 - Prince Tagadiya";
+            this.Text = "Agri-Drone Enterprise v1.2.7 - Prince Tagadiya";
             this.Size = new Size(1200, 800);
             this.BackColor = Color.FromArgb(245, 245, 245);
             
@@ -198,11 +198,11 @@ namespace MinimalGCS
             private DateTime _lastTelemetryRequest = DateTime.MinValue;
             public void SyncWithState(DroneState state)
             {
-                // Periodically request telemetry streams (2Hz) to ensure ArduPilot is sending data
+                // Periodically request telemetry streams (2Hz checking rate) to ensure ArduPilot is sending data
                 if (state.IsConnected && (DateTime.Now - _lastTelemetryRequest).TotalSeconds > 2)
                 {
                     _lastTelemetryRequest = DateTime.Now;
-                    SendCmd(66, 0, 2, 1); // REQUEST_DATA_STREAM: MAV_DATA_STREAM_ALL at 2Hz
+                    SendCmd(66, 6, 10, 1); // REQUEST_DATA_STREAM: MAV_DATA_STREAM_POSITION at 10Hz
                 }
 
                 _lblMsg.Text = state.LastMessage;
