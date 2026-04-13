@@ -106,19 +106,6 @@ namespace MinimalGCS
             {
                 string msg = System.Text.Encoding.ASCII.GetString(pkt.Payload, 1, pkt.Payload.Length - 1).TrimEnd('\0');
                 state.AddLog(msg);
-                
-                // Extract Total WP from status messages (e.g., "Mission: 9 WP")
-                if (msg.Contains("Mission:") && msg.Contains("WP"))
-                {
-                    try {
-                        var parts = msg.Split(' ');
-                        int idx = Array.IndexOf(parts, "Mission:");
-                        if (idx >= 0 && parts.Length > idx + 1)
-                        {
-                            if (int.TryParse(parts[idx+1], out int count)) state.TotalWp = count;
-                        }
-                    } catch { }
-                }
             }
         }
 
@@ -202,13 +189,8 @@ namespace MinimalGCS
             public void SyncWithState(DroneState state)
             {
                 _lblMsg.Text = state.LastMessage;
-                string gps = state.GpsFixType switch { 1 => "NO FIX", 2 => "2D FIX", 3 => "3D OK", 4 => "DGPS", 5 => "RTK-F", 6 => "RTK-FIX", _ => "SEARCHING" };
-                
-                // Calculate Progress Percentage
-                int progress = (state.TotalWp > 0) ? (int)((float)state.CurrentWp / state.TotalWp * 100) : 0;
-                if (progress > 100) progress = 100;
-
-                _lblTelemetry.Text = $"GPS: {gps} | ALT: {state.Alt:F1}m | DONE: {progress}% | {_main.GetModeName(state.Mode)}";
+                string gps = state.GpsFixType switch { 3 => "3D OK", 4 => "DGPS", 5 => "RTK-F", 6 => "RTK-FIX", _ => "SEARCHING" };
+                _lblTelemetry.Text = $"GPS: {gps} | ALT: {state.Alt:F1}m | WP: {state.CurrentWp} | {_main.GetModeName(state.Mode)}";
                 _lblTelemetry.ForeColor = state.IsArmed ? Color.DarkRed : Color.Black;
                 
                 if (!state.IsConnected) { _lblStatus.Text = "LOST CONNECTION"; _lblStatus.ForeColor = Color.Red; return; }
@@ -269,10 +251,8 @@ namespace MinimalGCS
                     await Task.Delay(50);
                 }
 
-                // 3. EXECUTE: MISSION_START (Start from WP 1 - Takeoff)
-                int startWp = (_state.ResumeWp > 0) ? _state.ResumeWp : 1;
-                _state.AddLog($"ACTION -> START FROM WP {startWp}");
-                SendCmd(300, startWp, 0); 
+                _state.AddLog($"ACTION -> START (WP: {_state.ResumeWp})");
+                SendCmd(300, _state.ResumeWp, 0); 
                 
                 _state.ResumeWp = 0; // Reset after use
 
