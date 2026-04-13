@@ -91,8 +91,12 @@ namespace MinimalGCS
             else if (pkt.MessageId == 24) // GPS_RAW_INT
             {
                 byte fix = (pkt.Payload.Length > 8) ? pkt.Payload[8] : (byte)0;
-                if (state.GpsFixType != fix) state.AddLog($"GPS Fix Change: {fix}");
-                state.GpsFixType = fix;
+                // Stability: Only update if we get a valid fix or if we haven't seen a fix for 5s
+                if (fix >= 3 || (DateTime.Now - state.LastHeartbeat).TotalSeconds > 5)
+                {
+                    state.AddLog($"GPS: {fix}");
+                    state.GpsFixType = fix;
+                }
             }
             else if (pkt.MessageId == 33) // GLOBAL_POSITION_INT
             {

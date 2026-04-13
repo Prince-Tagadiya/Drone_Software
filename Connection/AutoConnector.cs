@@ -80,7 +80,7 @@ namespace MinimalGCS.Connection
                 var now = DateTime.Now;
                 foreach (var kvp in ConnectedDevices.ToList())
                 {
-                    if ((now - kvp.Value.LastHeartbeat).TotalSeconds > 5)
+                    if ((now - kvp.Value.LastHeartbeat).TotalSeconds > 10)
                     {
                         if (ConnectedDevices.TryRemove(kvp.Key, out var device))
                         {

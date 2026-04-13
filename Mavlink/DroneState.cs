@@ -13,7 +13,7 @@ namespace MinimalGCS.Mavlink
         public double Lon { get; set; }
         public float Alt { get; set; }
         public DateTime LastHeartbeat { get; set; }
-        public bool IsConnected => (DateTime.Now - LastHeartbeat).TotalSeconds < 2;
+        public bool IsConnected => (DateTime.Now - LastHeartbeat).TotalSeconds < 10;
         
         // Log history and status messages
         public ConcurrentQueue<string> Messages { get; } = new ConcurrentQueue<string>();
