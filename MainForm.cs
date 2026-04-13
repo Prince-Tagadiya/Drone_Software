@@ -92,6 +92,7 @@ namespace MinimalGCS
             private byte _gpsFix = 0;
             private float _alt = 0;
             private DateTime _lastHeartbeat = DateTime.Now;
+            private int _gpsPacketCount = 0;
 
             public AgriWorkPanel(DiscoveredDevice device, MainForm main)
             {
