@@ -12,6 +12,8 @@ namespace MinimalGCS.Mavlink
         public double Lat { get; set; }
         public double Lon { get; set; }
         public float Alt { get; set; }
+        public int CurrentWp { get; set; }
+        public int ResumeWp { get; set; }
         public DateTime LastHeartbeat { get; set; }
         public bool IsConnected => (DateTime.Now - LastHeartbeat).TotalSeconds < 10;
         

@@ -29,11 +29,11 @@ namespace MinimalGCS.Mavlink
             return BuildPacket(sysId, compId, MavLinkMessages.COMMAND_LONG_ID, payload);
         }
 
-        public static byte[] CreateSetMode(byte sysId, byte compId, byte baseMode, uint customMode)
+        public static byte[] CreateSetMode(byte sysId, byte compId, byte targetSys, byte baseMode, uint customMode)
         {
             byte[] payload = new byte[6];
             Buffer.BlockCopy(BitConverter.GetBytes(customMode), 0, payload, 0, 4);
-            payload[4] = 1; // target_system (simple assumption for now)
+            payload[4] = targetSys;
             payload[5] = baseMode;
 
             return BuildPacket(sysId, compId, MavLinkMessages.SET_MODE_ID, payload);

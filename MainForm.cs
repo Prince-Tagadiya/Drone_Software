@@ -103,6 +103,10 @@ namespace MinimalGCS
             {
                 state.Alt = BitConverter.ToInt32(pkt.Payload, 16) / 1000.0f;
             }
+            else if (pkt.MessageId == 42) // MISSION_CURRENT
+            {
+                state.CurrentWp = BitConverter.ToUInt16(pkt.Payload, 0);
+            }
             else if (pkt.MessageId == 253) // STATUSTEXT
             {
                 string msg = System.Text.Encoding.ASCII.GetString(pkt.Payload, 1, pkt.Payload.Length - 1).TrimEnd('\0');
@@ -151,31 +155,57 @@ namespace MinimalGCS
                 _btnResume = CreateBtn("RESUME", Color.FromArgb(23, 162, 184), 210);
                 _btnRTL = CreateBtn("RETURN HOME (RTL)", Color.FromArgb(108, 117, 125), 270);
                 _btnLand = CreateBtn("LAND NOW", Color.FromArgb(255, 69, 0), 330);
-                _btnEmergency = CreateBtn("EMERGENCY STOP", Color.Red, 390);
+                
+                // --- SWIPE TO DISARM ---
+                var pnlSwipe = new Panel { Location = new Point(20, 390), Size = new Size(320, 60), BackColor = Color.FromArgb(220, 53, 69), BorderStyle = BorderStyle.None };
+                var lblSwipe = new Label { Text = ">>> SWIPE TO DISARM >>>", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = Color.White, Font = new Font("Segoe UI", 10, FontStyle.Bold), Cursor = Cursors.Hand };
+                var pnlHandle = new Panel { Location = new Point(2, 2), Size = new Size(80, 56), BackColor = Color.White, Cursor = Cursors.Hand };
+                pnlSwipe.Controls.Add(pnlHandle);
+                pnlSwipe.Controls.Add(lblSwipe);
+                lblSwipe.SendToBack();
+
+                bool isSwiping = false; int startX = 0;
+                pnlHandle.MouseDown += (s, e) => { isSwiping = true; startX = e.X; };
+                pnlHandle.MouseMove += (s, e) => 
+                {
+                    if (!isSwiping) return;
+                    int newX = pnlHandle.Left + (e.X - startX);
+                    if (newX < 2) newX = 2;
+                    if (newX > pnlSwipe.Width - pnlHandle.Width - 2) newX = pnlSwipe.Width - pnlHandle.Width - 2;
+                    pnlHandle.Left = newX;
+                    if (pnlHandle.Left > pnlSwipe.Width - pnlHandle.Width - 10) 
+                    {
+                        isSwiping = false; pnlHandle.Left = 2;
+                        SendCmd(400, 0, 21196); _pState = PanelState.IDLE;
+                        _state.AddLog("EMERGENCY SWIPE TRIPPED!");
+                    }
+                };
+                pnlHandle.MouseUp += (s, e) => { isSwiping = false; pnlHandle.Left = 2; };
 
                 _btnStart.Click += async (s, e) => await CommandStartMission();
-                _btnPause.Click += (s, e) => SendSetMode(5);
+                _btnPause.Click += (s, e) => { _state.ResumeWp = _state.CurrentWp; SendSetMode(5); };
                 _btnResume.Click += (s, e) => SendSetMode(3);
-                _btnRTL.Click += (s, e) => SendSetMode(6);
-                _btnLand.Click += (s, e) => SendSetMode(9);
-                _btnEmergency.Click += (s, e) => { SendCmd(400, 0, 21196); _pState = PanelState.IDLE; };
+                _btnRTL.Click += (s, e) => { _state.ResumeWp = _state.CurrentWp; SendSetMode(6); };
+                _btnLand.Click += (s, e) => { _state.ResumeWp = _state.CurrentWp; SendSetMode(9); };
 
-                this.Controls.AddRange(new Control[] { lblTitle, _lblStatus, _lblTelemetry, _lblMsg, _btnStart, _btnPause, _btnResume, _btnRTL, _btnLand, _btnEmergency });
+                this.Controls.AddRange(new Control[] { lblTitle, _lblStatus, _lblTelemetry, _lblMsg, _btnStart, _btnPause, _btnResume, _btnRTL, _btnLand, pnlSwipe });
             }
 
             public void SyncWithState(DroneState state)
             {
                 _lblMsg.Text = state.LastMessage;
                 string gps = state.GpsFixType switch { 3 => "3D OK", 4 => "DGPS", 5 => "RTK-F", 6 => "RTK-FIX", _ => "SEARCHING" };
-                _lblTelemetry.Text = $"GPS: {gps} | Alt: {state.Alt:F1}m | {_main.GetModeName(state.Mode)} | {(state.IsArmed ? "ARMED" : "DISARMED")}";
+                _lblTelemetry.Text = $"GPS: {gps} | ALT: {state.Alt:F1}m | WP: {state.CurrentWp} | {_main.GetModeName(state.Mode)}";
+                _lblTelemetry.ForeColor = state.IsArmed ? Color.DarkRed : Color.Black;
                 
                 if (!state.IsConnected) { _lblStatus.Text = "LOST CONNECTION"; _lblStatus.ForeColor = Color.Red; return; }
                 
                 if (_pState == PanelState.IDLE)
                 {
-                    _lblStatus.Text = state.Mode == 3 ? "MISSION ACTIVE" : "READY";
-                    _lblStatus.ForeColor = state.Mode == 3 ? Color.Green : Color.Blue;
-
+                    if (state.Mode == 3) { _lblStatus.Text = "MISSION ACTIVE"; _lblStatus.ForeColor = Color.Green; }
+                    else if (state.Mode == 5) { _lblStatus.Text = "MISSION PAUSED"; _lblStatus.ForeColor = Color.Orange; }
+                    else { _lblStatus.Text = "READY"; _lblStatus.ForeColor = Color.Blue; }
+                    
                     // DYNAMIC BUTTON: START (On Ground) vs RESUME (In Air)
                     if (!state.IsArmed)
                     {
@@ -226,8 +256,10 @@ namespace MinimalGCS
                     await Task.Delay(50);
                 }
 
-                _state.AddLog("ACTION -> MISSION_START");
-                SendCmd(300, 0, 0); 
+                _state.AddLog($"ACTION -> START (WP: {_state.ResumeWp})");
+                SendCmd(300, _state.ResumeWp, 0); 
+                
+                _state.ResumeWp = 0; // Reset after use
 
                 _pState = PanelState.IDLE;
                 _lblStatus.Text = "MISSION ACTIVE";
@@ -258,7 +290,7 @@ namespace MinimalGCS
                 b.FlatAppearance.BorderSize = 0; return b;
             }
 
-            private void SendSetMode(uint m) => _device.Interface.Send(MavLinkCommands.CreateSetMode(255, 1, 1, m));
+            private void SendSetMode(uint m) => _device.Interface.Send(MavLinkCommands.CreateSetMode(255, 1, _device.SysId, 1, m));
             private void SendCmd(ushort c, float p1, float p2=0, float p3=0, float p4=0, float p5=0, float p6=0, float p7=0) 
                 => _device.Interface.Send(MavLinkCommands.CreateCommandLong(255, 1, _device.SysId, _device.CompId, c, p1, p2, p3, p4, p5, p6, p7));
         }
